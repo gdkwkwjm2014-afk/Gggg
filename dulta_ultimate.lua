@@ -1,51 +1,90 @@
--- Упрощенный стабильный скрипт DULTA
+-- DULTA ULTIMATE V1.5 (MOBILE REBUILD)
 local p = game.Players.LocalPlayer
+local mouse = p:GetMouse()
+local camera = workspace.CurrentCamera
+local rs = game:GetService("RunService")
+
+-- СОЗДАЕМ ИНТЕРФЕЙС
 local sg = Instance.new("ScreenGui", game.CoreGui)
-sg.Name = "DultaMobile"
+sg.Name = "Dulta_V15"
 
--- КНОПКА МЕНЮ (Маленький красный квадрат)
-local btn = Instance.new("TextButton", sg)
-btn.Size = UDim2.new(0, 50, 0, 50)
-btn.Position = UDim2.new(0.1, 0, 0.2, 0)
-btn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-btn.Text = "D"
-btn.TextColor3 = Color3.new(1,1,1)
-btn.Draggable = true -- Можно двигать!
+-- ГЛАВНАЯ КНОПКА (D)
+local mainBtn = Instance.new("TextButton", sg)
+mainBtn.Size = UDim2.new(0, 45, 0, 45)
+mainBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
+mainBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+mainBtn.Text = "D"
+mainBtn.TextColor3 = Color3.new(1,1,1)
+mainBtn.Draggable = true
 
--- КНОПКА АИМА
-local aimBtn = Instance.new("TextButton", sg)
-aimBtn.Size = UDim2.new(0, 80, 0, 40)
-aimBtn.Position = UDim2.new(0.1, 60, 0.2, 5)
-aimBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
-aimBtn.Text = "AIM: OFF"
-aimBtn.TextColor3 = Color3.new(1,1,1)
+-- ПАНЕЛЬ УПРАВЛЕНИЯ
+local menu = Instance.new("Frame", sg)
+menu.Size = UDim2.new(0, 200, 0, 250)
+menu.Position = UDim2.new(0.05, 50, 0.2, 0)
+menu.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+menu.BorderSizePixel = 2
+menu.BorderColor3 = Color3.fromRGB(255, 0, 0)
+menu.Visible = false
 
--- ПЕРЕМЕННЫЕ
+local function createToggle(name, pos, callback)
+    local btn = Instance.new("TextButton", menu)
+    btn.Size = UDim2.new(0, 180, 0, 40)
+    btn.Position = UDim2.new(0, 10, 0, pos)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.Text = name .. ": OFF"
+    btn.TextColor3 = Color3.new(1,1,1)
+    
+    local state = false
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.Text = name .. ": " .. (state and "ON" or "OFF")
+        btn.BackgroundColor3 = state and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(40, 40, 40)
+        callback(state)
+    end)
+end
+
+-- ПЕРЕМЕННЫЕ ФУНКЦИЙ
 local aimOn = false
-local keyPassed = false
+local espOn = false
+local flyOn = false
 
--- ЛОГИКА АИМА
-aimBtn.MouseButton1Click:Connect(function()
-    aimOn = not aimOn
-    if aimOn then
-        aimBtn.Text = "AIM: ON"
-        aimBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    else
-        aimBtn.Text = "AIM: OFF"
-        aimBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
-    end
+-- ЛОГИКА ОТКРЫТИЯ МЕНЮ
+mainBtn.MouseButton1Click:Connect(function()
+    menu.Visible = not menu.Visible
 end)
 
--- САМ АИМ (БЕЗ НАВОДКИ ЧЕРЕЗ СТЕНЫ)
-game:GetService("RunService").RenderStepped:Connect(function()
+-- ФУНКЦИИ
+createToggle("AIMBOT", 10, function(v) aimOn = v end)
+createToggle("ESP (ВХ)", 60, function(v) espOn = v end)
+createToggle("FLY (ПОЛЕТ)", 110, function(v) flyOn = v end)
+createToggle("SPEED (БЕГ)", 160, function(v) 
+    p.Character.Humanoid.WalkSpeed = v and 100 or 16 
+end)
+
+-- РАБОТА ESP (ВХ)
+local function makeEsp(player)
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "DultaESP"
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Adornee = player.Character
+    box.Color3 = Color3.new(1, 0, 0)
+    box.Size = player.Character:GetExtentsSize()
+    box.Transparency = 0.5
+    box.Parent = player.Character
+end
+
+-- ЦИКЛ ОБНОВЛЕНИЯ
+rs.RenderStepped:Connect(function()
+    -- AIMBOT LOGIC
     if aimOn then
         local target = nil
         local maxDist = 500
         for _, v in pairs(game.Players:GetPlayers()) do
             if v ~= p and v.Character and v.Character:FindFirstChild("Head") then
                 local head = v.Character.Head
-                local pos, vis = workspace.CurrentCamera:WorldToViewportPoint(head.Position)
-                if vis then -- Проверка видимости
+                local pos, vis = camera:WorldToViewportPoint(head.Position)
+                if vis then
                     local mag = (Vector2.new(pos.X, pos.Y) - game:GetService("UserInputService"):GetMouseLocation()).Magnitude
                     if mag < maxDist then
                         maxDist = mag
@@ -55,10 +94,24 @@ game:GetService("RunService").RenderStepped:Connect(function()
             end
         end
         if target then
-            workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, target.Position)
+            camera.CFrame = CFrame.new(camera.CFrame.Position, target.Position)
         end
     end
+    
+    -- ESP LOGIC
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if v ~= p and v.Character then
+            local hasEsp = v.Character:FindFirstChild("DultaESP")
+            if espOn and not hasEsp then
+                makeEsp(v)
+            elseif not espOn and hasEsp then
+                hasEsp:Destroy()
+            end
+        end
+    end
+    
+    -- FLY LOGIC
+    if flyOn and p.Character then
+        p.Character.HumanoidRootPart.Velocity = Vector3.new(0, 50, 0) -- Простой подлет
+    end
 end)
-
--- УВЕДОМЛЕНИЕ О ЗАПУСКЕ
-print("DULTA LOADED")
