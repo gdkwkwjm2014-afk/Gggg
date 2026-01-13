@@ -1,93 +1,86 @@
--- DULTA V4.0 ULTIMATE "MASTER PASTA" 
--- Смесь Unloosed, Neverlose и Lost Front
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-if not game:IsLoaded() then game.Loaded:Wait() end
+local Window = Rayfield:CreateWindow({
+   Name = "DULTA ULTIMATE v7.0",
+   LoadingTitle = "Запуск Elite Софта...",
+   LoadingSubtitle = "Team Check & Visuals Edition",
+   ConfigurationSaving = { Enabled = true, Folder = "DultaUltimate" }
+})
 
--- [ СЕРВИСЫ ]
-local Players = game:GetService("Players")
-local RS = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
+local LP = game:GetService("Players").LocalPlayer
 local Camera = workspace.CurrentCamera
-local LP = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
 
--- [ НАСТРОЙКИ ]
-getgenv().Config = {
-    Enabled = false,
-    TeamCheck = true,
-    VisibleCheck = true,
-    
-    -- Aim
-    AimFOV = 150,
-    AimPart = "Head",
-    Prediction = 0.165,
-    HitChance = 100,
-    
-    -- Visuals
-    ShowFOV = true,
-    ESP_Enabled = false,
-    ESP_Boxes = true,
-    ESP_Names = true,
-    ESP_Health = true,
-    
-    -- Misc
-    WalkSpeed = 16,
-    JumpPower = 50
-}
+-- Глобальные настройки
+getgenv().AimEnabled = false
+getgenv().AimFOV = 150
+getgenv().AimPart = "Head"
+getgenv().ESPEnabled = false
+getgenv().WalkSpeed = 16
 
--- [ UI LIBRARY ]
-local UI = loadstring(game:HttpGet("https://raw.githubusercontent.com/cueshut/saves/main/compact"))()
-UI = UI.init("DULTA ULTIMATE", "v4.0", "Private")
-
--- [ РИСОВАНИЕ FOV ]
+-- Рисование круга FOV (Центральный)
 local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1
+FOVCircle.Thickness = 1.5
+FOVCircle.Color = Color3.fromRGB(255, 255, 255) -- Белый для нейтральности
 FOVCircle.NumSides = 100
-FOVCircle.Radius = Config.AimFOV
+FOVCircle.Radius = getgenv().AimFOV
 FOVCircle.Filled = false
-FOVCircle.Visible = Config.ShowFOV
-FOVCircle.Color = Color3.fromRGB(255, 50, 50)
+FOVCircle.Visible = true
 
--- [ ТАБЫ ]
-local AimTab = UI:AddTab("Aim", "Combat")
-local VisualTab = UI:AddTab("Visuals", "ESP")
-local MiscTab = UI:AddTab("Misc", "Character")
+-- Вкладка Combat
+local CombatTab = Window:CreateTab("Combat ⚔️")
+CombatTab:CreateToggle({
+   Name = "Hard Lock (Враги)",
+   CurrentValue = false,
+   Callback = function(Value) getgenv().AimEnabled = Value end,
+})
+CombatTab:CreateSlider({
+   Name = "Размер Круга FOV",
+   Min = 10, Max = 800, CurrentValue = 150,
+   Callback = function(Value) 
+      getgenv().AimFOV = Value 
+      FOVCircle.Radius = Value
+   end,
+})
+CombatTab:CreateDropdown({
+   Name = "Цель",
+   Options = {"Head", "HumanoidRootPart"},
+   CurrentOption = {"Head"},
+   Callback = function(Option) getgenv().AimPart = Option[1] end,
+})
 
--- [ НАПОЛНЕНИЕ AIM ]
-local AimSection = AimTab:AddSeperator("Silent Aim Settings")
-AimSection:AddToggle({title = "Enabled", checked = false, callback = function(v) Config.Enabled = v end})
-AimSection:AddSlider({title = "FOV Radius", values = {min=50, max=800, default=150}, callback = function(v) Config.AimFOV = v end})
-AimSection:AddToggle({title = "Show FOV", checked = true, callback = function(v) Config.ShowFOV = v end})
-AimSection:AddSelection({title = "Target", options = {"Head", "HumanoidRootPart"}, callback = function(v) Config.AimPart = (v[1] == 1 and "Head" or "HumanoidRootPart") end})
+-- Вкладка Visuals
+local VisualsTab = Window:CreateTab("Visuals 👁️")
+VisualsTab:CreateToggle({
+   Name = "Highlight ESP (Цветной)",
+   CurrentValue = false,
+   Callback = function(Value) getgenv().ESPEnabled = Value end,
+})
 
--- [ НАПОЛНЕНИЕ VISUALS ]
-local EspSection = VisualTab:AddSeperator("ESP Settings")
-EspSection:AddToggle({title = "Enable ESP", callback = function(v) Config.ESP_Enabled = v end})
-EspSection:AddToggle({title = "Show Boxes", callback = function(v) Config.ESP_Boxes = v end})
-EspSection:AddToggle({title = "Show Names", callback = function(v) Config.ESP_Names = v end})
+-- Вкладка Misc
+local MiscTab = Window:CreateTab("Misc ⚙️")
+MiscTab:CreateSlider({
+   Name = "Скорость бега",
+   Min = 16, Max = 250, CurrentValue = 16,
+   Callback = function(Value) getgenv().WalkSpeed = Value end,
+})
 
--- [ НАПОЛНЕНИЕ MISC ]
-local CharSection = MiscTab:AddSeperator("Movement")
-CharSection:AddSlider({title = "Speed", values = {min=16, max=200, default=16}, callback = function(v) Config.WalkSpeed = v end})
-
--- [ ЛОГИКА АИМА ]
-local function GetClosestPlayer()
+-- Функция поиска ближайшего ВРАГА
+local function GetClosestEnemy()
     local target = nil
-    local dist = Config.AimFOV
+    local shortestDist = getgenv().AimFOV
     
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LP and p.Character and p.Character:FindFirstChild(Config.AimPart) then
-            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
+        -- Проверка: не я, живой, есть нужная часть тела, и ГЛАВНОЕ — не мой тиммейт
+        if v ~= LP and v.Team ~= LP.Team and v.Character and v.Character:FindFirstChild(getgenv().AimPart) then
+            local hum = v.Character:FindFirstChildOfClass("Humanoid")
             if hum and hum.Health > 0 then
-                if Config.TeamCheck and p.Team == LP.Team then continue end
-                
-                local head = p.Character[Config.AimPart]
-                local pos, vis = Camera:WorldToViewportPoint(head.Position)
-                
+                local pos, vis = Camera:WorldToViewportPoint(v.Character[getgenv().AimPart].Position)
                 if vis then
-                    local mag = (Vector2.new(pos.X, pos.Y) - UIS:GetMouseLocation()).Magnitude
-                    if mag < dist then
-                        dist = mag
-                        target = head
+                    local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                    if dist < shortestDist then
+                        shortestDist = dist
+                        target = v.Character[getgenv().AimPart]
                     end
                 end
             end
@@ -96,54 +89,49 @@ local function GetClosestPlayer()
     return target
 end
 
--- [ ХУК ДЛЯ БЕЗОПАСНОСТИ ]
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    if method == "Kick" then return nil end
-    return oldNamecall(self, ...)
-end))
-
--- [ ГЛАВНЫЙ ЦИКЛ ]
-RS.RenderStepped:Connect(function()
-    FOVCircle.Visible = Config.ShowFOV
-    FOVCircle.Radius = Config.AimFOV
-    FOVCircle.Position = UIS:GetMouseLocation()
+-- Основной цикл
+game:GetService("RunService").RenderStepped:Connect(function()
+    -- Позиция круга всегда в центре
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    FOVCircle.Visible = getgenv().AimEnabled
     
-    if Config.Enabled then
-        local target = GetClosestPlayer()
+    -- Аимбот (Только враги)
+    if getgenv().AimEnabled then
+        local target = GetClosestEnemy()
         if target then
-            -- Silent Aim Logic (Плавная доводка)
-            local targetPos = Camera:WorldToViewportPoint(target.Position)
-            local mousePos = UIS:GetMouseLocation()
-            local moveX = (targetPos.X - mousePos.X) * 0.15
-            local moveY = (targetPos.Y - mousePos.Y) * 0.15
-            
-            -- Имитация движения мыши (безопасно для мобилок и ПК)
-            if mousemoverel then mousemoverel(moveX, moveY) end
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
         end
     end
-    
-    -- ESP Logic
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LP and p.Character then
-            local highlight = p.Character:FindFirstChild("DultaHighlight")
-            if Config.ESP_Enabled and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-                if not highlight then
-                    highlight = Instance.new("Highlight", p.Character)
-                    highlight.Name = "DultaHighlight"
+
+    -- ВХ (Враги — Красный, Свои — Синий)
+    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
+        if v ~= LP and v.Character then
+            local high = v.Character:FindFirstChild("DultaESP")
+            if getgenv().ESPEnabled and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+                if not high then
+                    high = Instance.new("Highlight", v.Character)
+                    high.Name = "DultaESP"
                 end
-                highlight.FillColor = (p.Team == LP.Team and Color3.new(0,1,0) or Color3.new(1,0,0))
+                
+                -- Установка цвета в зависимости от команды
+                if v.Team == LP.Team then
+                    high.FillColor = Color3.fromRGB(0, 100, 255) -- Синий (Союзник)
+                    high.OutlineColor = Color3.fromRGB(255, 255, 255)
+                else
+                    high.FillColor = Color3.fromRGB(255, 0, 0)   -- Красный (Враг)
+                    high.OutlineColor = Color3.fromRGB(0, 0, 0)
+                end
+                high.FillAlpha = 0.5
             else
-                if highlight then highlight:Destroy() end
+                if high then high:Destroy() end
             end
         end
     end
-    
-    -- Speed
+
+    -- Скорость
     if LP.Character and LP.Character:FindFirstChild("Humanoid") then
-        LP.Character.Humanoid.WalkSpeed = Config.WalkSpeed
+        LP.Character.Humanoid.WalkSpeed = getgenv().WalkSpeed
     end
 end)
 
-UI:Notify("DULTA v4.0", "Все системы запущены!")
+Rayfield:Notify({Title = "DULTA v7.0", Content = "Удачной охоты на врагов!", Duration = 5})
