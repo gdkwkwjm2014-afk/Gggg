@@ -3,146 +3,169 @@ local LP = Players.LocalPlayer
 local RS = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
+local Mouse = LP:GetMouse()
 
 -- [[ НАСТРОЙКИ ]]
-getgenv().AimEnabled = false
-getgenv().ESPEnabled = false
-getgenv().FlyEnabled = false
-getgenv().Speed = 16
+getgenv().Config = {
+    Aim = false,
+    Silent = true, -- Булет трак
+    ESP = false,
+    NoRecoil = true,
+    RapidFire = true,
+    Fly = false,
+    Speed = 16
+}
 
--- [[ СОЗДАНИЕ GUI (БЕЗ ЛАГОВ) ]]
-local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-local MainFrame = Instance.new("Frame", ScreenGui)
-local Title = Instance.new("TextLabel", MainFrame)
-local ToggleAim = Instance.new("TextButton", MainFrame)
-local ToggleESP = Instance.new("TextButton", MainFrame)
-local ToggleFly = Instance.new("TextButton", MainFrame)
-local SpeedInput = Instance.new("TextBox", MainFrame)
-local Icon = Instance.new("TextButton", ScreenGui)
-
--- Стиль главного окна
-MainFrame.Size = UDim2.new(0, 200, 0, 260)
-MainFrame.Position = UDim2.new(0.5, -100, 0.4, -130)
-MainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Visible = false
-
-local UICorner = Instance.new("UICorner", MainFrame)
-
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "DULTA | RUST ALPHA"
-Title.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-Title.TextColor3 = Color3.new(1,1,1)
-Title.Font = Enum.Font.SourceSansBold
-
--- Настройка кнопок (универсальная функция)
-local function StyleButton(btn, pos, text)
-    btn.Size = UDim2.new(0, 180, 0, 40)
-    btn.Position = UDim2.new(0, 10, 0, pos)
-    btn.Text = text
-    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.SourceSans
-    Instance.new("UICorner", btn)
+-- [[ ПРОВЕРКА ДРУЗЕЙ ]]
+local function IsFriend(Player)
+    if Player == LP then return true end
+    return LP:IsFriendsWith(Player.UserId)
 end
 
-StyleButton(ToggleAim, 45, "Aimbot: OFF")
-StyleButton(ToggleESP, 95, "Visuals: OFF")
-StyleButton(ToggleFly, 145, "Fly: OFF")
-StyleButton(SpeedInput, 195, "Speed: 16")
-SpeedInput.PlaceholderText = "Type Speed here"
-SpeedInput.Text = "16"
+-- [[ GUI ]]
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 220, 0, 320)
+Main.Position = UDim2.new(0.5, -110, 0.5, -160)
+Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Main.Active = true
+Main.Draggable = true
 
--- Иконка открытия
-Icon.Size = UDim2.new(0, 60, 0, 60)
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "DULTA ULTIMATE | FLICK"
+Title.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+Title.TextColor3 = Color3.new(1,1,1)
+
+local function CreateBtn(name, pos, callback)
+    local btn = Instance.new("TextButton", Main)
+    btn.Size = UDim2.new(0, 200, 0, 35)
+    btn.Position = UDim2.new(0, 10, 0, pos)
+    btn.Text = name .. ": OFF"
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.MouseButton1Click:Connect(function()
+        callback(btn)
+    end)
+    return btn
+end
+
+CreateBtn("Rage Aimbot", 40, function(b)
+    getgenv().Config.Aim = not getgenv().Config.Aim
+    b.Text = "Rage Aimbot: " .. (getgenv().Config.Aim and "ON" or "OFF")
+    b.BackgroundColor3 = getgenv().Config.Aim and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(40, 40, 40)
+end)
+
+CreateBtn("Bullet Track", 85, function(b)
+    getgenv().Config.Silent = not getgenv().Config.Silent
+    b.Text = "Bullet Track: " .. (getgenv().Config.Silent and "ON" or "OFF")
+end)
+
+CreateBtn("Visuals", 130, function(b)
+    getgenv().Config.ESP = not getgenv().Config.ESP
+    b.Text = "Visuals: " .. (getgenv().Config.ESP and "ON" or "OFF")
+end)
+
+CreateBtn("Fly Mode", 175, function(b)
+    getgenv().Config.Fly = not getgenv().Config.Fly
+    b.Text = "Fly: " .. (getgenv().Config.Fly and "ON" or "OFF")
+end)
+
+local SpdInput = Instance.new("TextBox", Main)
+SpdInput.Size = UDim2.new(0, 200, 0, 35)
+SpdInput.Position = UDim2.new(0, 10, 0, 220)
+SpdInput.PlaceholderText = "Speed Value"
+SpdInput.Text = "16"
+SpdInput.FocusLost:Connect(function() getgenv().Config.Speed = tonumber(SpdInput.Text) or 16 end)
+
+-- Иконка
+local Icon = Instance.new("TextButton", ScreenGui)
+Icon.Size = UDim2.new(0, 50, 0, 50)
 Icon.Position = UDim2.new(0, 10, 0.5, 0)
 Icon.Text = "DULTA"
-Icon.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+Icon.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
 Icon.TextColor3 = Color3.new(1,1,1)
-Icon.Font = Enum.Font.SourceSansBold
 Icon.Draggable = true
-Instance.new("UICorner", Icon).CornerRadius = UDim.new(1, 0)
+Icon.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
 
-Icon.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
-end)
-
--- [[ ЛОГИКА ФУНКЦИЙ ]]
-ToggleAim.MouseButton1Click:Connect(function()
-    getgenv().AimEnabled = not getgenv().AimEnabled
-    ToggleAim.Text = getgenv().AimEnabled and "Aimbot: ON" or "Aimbot: OFF"
-    ToggleAim.BackgroundColor3 = getgenv().AimEnabled and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(60, 60, 60)
-end)
-
-ToggleESP.MouseButton1Click:Connect(function()
-    getgenv().ESPEnabled = not getgenv().ESPEnabled
-    ToggleESP.Text = getgenv().ESPEnabled and "Visuals: ON" or "Visuals: OFF"
-    ToggleESP.BackgroundColor3 = getgenv().ESPEnabled and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(60, 60, 60)
-end)
-
-ToggleFly.MouseButton1Click:Connect(function()
-    getgenv().FlyEnabled = not getgenv().FlyEnabled
-    ToggleFly.Text = getgenv().FlyEnabled and "Fly: ON" or "Fly: OFF"
-    ToggleFly.BackgroundColor3 = getgenv().FlyEnabled and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(60, 60, 60)
-end)
-
-SpeedInput.FocusLost:Connect(function()
-    getgenv().Speed = tonumber(SpeedInput.Text) or 16
-end)
-
--- [[ ПРОВЕРКА ТИМЕЙТА ]]
-local function IsEnemy(v)
-    if v.Team ~= LP.Team or v.TeamColor ~= LP.TeamColor then return true end
-    return false
+-- [[ ГЛАВНАЯ ЛОГИКА (RAGE) ]]
+local function GetClosest()
+    local target, dist = nil, 2000
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LP and not IsFriend(v) and v.Character and v.Character:FindFirstChild("Head") then
+            local head = v.Character.Head
+            local pos, vis = Camera:WorldToViewportPoint(head.Position)
+            if vis then
+                local m = (Vector2.new(pos.X, pos.Y) - UIS:GetMouseLocation()).Magnitude
+                if m < dist then dist = m; target = head end
+            end
+        end
+    end
+    return target
 end
 
--- [[ ГЛАВНЫЙ ЦИКЛ (RUST FIX) ]]
-RS.RenderStepped:Connect(function()
-    -- AIMBOT (Legit Smooth)
-    if getgenv().AimEnabled then
-        local target = nil
-        local dist = 600
-        for _, v in pairs(Players:GetPlayers()) do
-            if v ~= LP and IsEnemy(v) and v.Character and v.Character:FindFirstChild("Head") then
-                local pos, vis = Camera:WorldToViewportPoint(v.Character.Head.Position)
-                if vis then
-                    local mag = (Vector2.new(pos.X, pos.Y) - UIS:GetMouseLocation()).Magnitude
-                    if mag < dist then dist = mag; target = v.Character.Head end
+-- Взлом стрельбы (No Recoil & Rapid Fire)
+task.spawn(function()
+    while task.wait() do
+        if getgenv().Config.NoRecoil or getgenv().Config.RapidFire then
+            for _, v in pairs(getreg()) do
+                if type(v) == "table" and rawget(v, "Recoil") then
+                    v.Recoil = 0
+                    v.Spread = 0
+                    v.FireRate = 0.05 -- Очень быстро
+                    v.Ammo = 999
+                    v.MaxAmmo = 999
                 end
             end
         end
-        if target then
-            Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, target.Position), 0.15)
+    end
+end)
+
+-- Булет Трак (Silent Aim)
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    if method == "FindPartOnRayWithIgnoreList" and getgenv().Config.Silent then
+        local t = GetClosest()
+        if t then
+            return t, t.Position, t.CFrame.LookVector, t.Material
         end
     end
+    return oldNamecall(self, ...)
+end)
 
-    -- ESP
-    if getgenv().ESPEnabled then
+RS.RenderStepped:Connect(function()
+    -- Аимбот (Резкий)
+    if getgenv().Config.Aim then
+        local t = GetClosest()
+        if t then Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, t.Position) end
+    end
+
+    -- ВХ
+    if getgenv().Config.ESP then
         for _, v in pairs(Players:GetPlayers()) do
             if v ~= LP and v.Character then
                 local h = v.Character:FindFirstChild("DultaESP") or Instance.new("Highlight", v.Character)
                 h.Name = "DultaESP"
-                h.FillColor = IsEnemy(v) and Color3.new(1,0,0) or Color3.new(0,1,0)
-                h.FillAlpha = 0.5
+                h.FillColor = IsFriend(v) and Color3.new(0,1,0) or Color3.new(1,0,0)
+                h.FillAlpha = 0.4
             end
         end
     else
         for _, v in pairs(game:GetDescendants()) do if v.Name == "DultaESP" then v:Destroy() end end
     end
 
-    -- MOVEMENT
+    -- Флай и Спид
     if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LP.Character.HumanoidRootPart
-        local hum = LP.Character:FindFirstChildOfClass("Humanoid")
-        if getgenv().FlyEnabled then
-            hrp.Velocity = Vector3.new(0, 1.5, 0) -- Плавное парение
-            if hum.MoveDirection.Magnitude > 0 then
-                hrp.CFrame = hrp.CFrame + (Camera.CFrame.LookVector * 1.5)
+        if getgenv().Config.Fly then
+            hrp.Velocity = Vector3.new(0, 2, 0)
+            if LP.Character.Humanoid.MoveDirection.Magnitude > 0 then
+                hrp.CFrame = hrp.CFrame + (Camera.CFrame.LookVector * 1.8)
             end
-        elseif getgenv().Speed > 16 and hum.MoveDirection.Magnitude > 0 then
-            hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (getgenv().Speed / 100))
+        elseif getgenv().Config.Speed > 16 and LP.Character.Humanoid.MoveDirection.Magnitude > 0 then
+            hrp.CFrame = hrp.CFrame + (LP.Character.Humanoid.MoveDirection * (getgenv().Config.Speed / 100))
         end
     end
 end)
