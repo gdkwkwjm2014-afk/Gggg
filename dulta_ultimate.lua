@@ -1,55 +1,65 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("DULTA ULTIMATE v12 (1000% WORK)", "BloodTheme")
 
-local Window = Rayfield:CreateWindow({
-   Name = "🔥 DULTA ULTIMATE | Private v10.0",
-   LoadingTitle = "Загрузка системы DULTA...",
-   LoadingSubtitle = "by gdkwkwjm2014-afk",
-   ConfigurationSaving = {
-      Enabled = true,
-      Folder = "DultaSettings",
-      FileName = "MainConfig"
-   },
-   Discord = {
-      Enabled = false,
-      Invite = "",
-      RememberJoins = true
-   },
-   KeySystem = false
-})
-
--- // ПЕРЕМЕННЫЕ (ЯДРО) //
-local LP = game:GetService("Players").LocalPlayer
-local Camera = workspace.CurrentCamera
-local RunService = game:GetService("RunService")
+-- Сервисы
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local RS = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
 
-getgenv().AimbotEnabled = false
+-- Настройки
+getgenv().AimEnabled = false
 getgenv().ESPEnabled = false
 getgenv().FOVSize = 150
-getgenv().SpeedVal = 16
-getgenv().NoRecoil = false
+getgenv().Speed = 16
 
--- // ФУНКЦИЯ ОТРИСОВКИ КРУГА //
+-- FOV Circle
 local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1.5
-FOVCircle.Color = Color3.fromRGB(255, 0, 0) -- Красный
-FOVCircle.NumSides = 100
+FOVCircle.Thickness = 2
+FOVCircle.Color = Color3.fromRGB(255, 0, 0)
 FOVCircle.Filled = false
 FOVCircle.Visible = false
 
--- // ЛОГИКА АИМА (ИЗ ИСХОДНИКА) //
-local function GetClosest()
+-- Вкладки
+local Main = Window:NewTab("Main")
+local Combat = Main:NewSection("Combat Settings")
+local Visuals = Main:NewSection("Visuals Settings")
+local Misc = Main:NewSection("Player Mods")
+
+-- Функции Combat
+Combat:NewToggle("Aimbot (Hard Lock)", "Наведение на врага", function(state)
+    getgenv().AimEnabled = state
+    FOVCircle.Visible = state
+end)
+
+Combat:NewSlider("FOV Size", "Радиус круга", 800, 50, function(s)
+    getgenv().FOVSize = s
+    FOVCircle.Radius = s
+end)
+
+-- Функции Visuals
+Visuals:NewToggle("ESP (Box + Highlight)", "Видеть сквозь стены", function(state)
+    getgenv().ESPEnabled = state
+end)
+
+-- Функции Misc
+Misc:NewSlider("WalkSpeed", "Скорость бега", 250, 16, function(s)
+    getgenv().Speed = s
+end)
+
+-- Ядро Аимбота
+local function GetTarget()
     local target = nil
     local dist = getgenv().FOVSize
-    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-        if v ~= LP and v.Character and v.Character:FindFirstChild("Head") then
-            if v.Team == LP.Team then continue end -- Team Check
-            local pos, vis = Camera:WorldToViewportPoint(v.Character.Head.Position)
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LP and v.Team ~= LP.Team and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local pos, vis = Camera:WorldToViewportPoint(v.Character.HumanoidRootPart.Position)
             if vis then
                 local mag = (Vector2.new(pos.X, pos.Y) - UIS:GetMouseLocation()).Magnitude
                 if mag < dist then
                     dist = mag
-                    target = v.Character.Head
+                    target = v.Character.HumanoidRootPart
                 end
             end
         end
@@ -57,95 +67,36 @@ local function GetClosest()
     return target
 end
 
--- // ВКЛАДКИ МЕНЮ //
-local MainTab = Window:CreateTab("Combat ⚔️")
-local VisualsTab = Window:CreateTab("Visuals 👁️")
-local MiscTab = Window:AddTab("Misc ⚙️")
-
--- // СЕКЦИЯ COMBAT //
-MainTab:CreateSection("Настройки Убийства")
-
-MainTab:CreateToggle({
-   Name = "Enable Aimbot (Hard Lock)",
-   CurrentValue = false,
-   Callback = function(Value) 
-      getgenv().AimbotEnabled = Value 
-      FOVCircle.Visible = Value
-   end,
-})
-
-MainTab:CreateSlider({
-   Name = "Aimbot FOV (Радиус)",
-   Min = 10, Max = 800, CurrentValue = 150,
-   Callback = function(Value) 
-      getgenv().FOVSize = Value
-      FOVCircle.Radius = Value
-   end,
-})
-
-MainTab:CreateToggle({
-   Name = "No Recoil (Без отдачи)",
-   CurrentValue = false,
-   Callback = function(Value) getgenv().NoRecoil = Value end,
-})
-
--- // СЕКЦИЯ VISUALS //
-VisualsTab:CreateSection("Визуальные функции")
-
-VisualsTab:CreateToggle({
-   Name = "Highlight ESP (Wallhack)",
-   CurrentValue = false,
-   Callback = function(Value) getgenv().ESPEnabled = Value end,
-})
-
--- // СЕКЦИЯ MISC //
-MiscTab:CreateSection("Игрок")
-
-MiscTab:CreateSlider({
-   Name = "WalkSpeed (Скорость)",
-   Min = 16, Max = 200, CurrentValue = 16,
-   Callback = function(Value) getgenv().SpeedVal = Value end,
-})
-
--- // ГЛАВНЫЙ ЦИКЛ ОБРАБОТКИ //
-RunService.RenderStepped:Connect(function()
-    -- Центрируем круг
+-- Основной цикл (Вне меню для стабильности)
+RS.RenderStepped:Connect(function()
     FOVCircle.Position = UIS:GetMouseLocation()
     
-    -- Аимбот
-    if getgenv().AimbotEnabled then
-        local target = GetClosest()
-        if target then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+    -- Логика Аима
+    if getgenv().AimEnabled then
+        local t = GetTarget()
+        if t then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, t.Position)
         end
     end
 
-    -- ESP (Подсветка врагов)
-    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-        if v.Character then
-            local highlight = v.Character:FindFirstChild("DultaESP")
-            if getgenv().ESPEnabled and v ~= LP and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-                if not highlight then
-                    highlight = Instance.new("Highlight", v.Character)
-                    highlight.Name = "DultaESP"
+    -- Логика Скорости
+    if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+        LP.Character.Humanoid.WalkSpeed = getgenv().Speed
+    end
+
+    -- Логика ESP
+    if getgenv().ESPEnabled then
+        for _, v in pairs(Players:GetPlayers()) do
+            if v ~= LP and v.Character then
+                local h = v.Character:FindFirstChild("DultaHighlight")
+                if not h and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+                    h = Instance.new("Highlight", v.Character)
+                    h.Name = "DultaHighlight"
+                    h.FillColor = (v.Team == LP.Team and Color3.new(0, 1, 0) or Color3.new(1, 0, 0))
+                elseif not getgenv().ESPEnabled and h then
+                    h:Destroy()
                 end
-                highlight.FillColor = (v.Team == LP.Team and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
-                highlight.FillAlpha = 0.4
-            else
-                if highlight then highlight:Destroy() end
             end
         end
     end
-    
-    -- Скорость
-    if LP.Character and LP.Character:FindFirstChild("Humanoid") then
-        LP.Character.Humanoid.WalkSpeed = getgenv().SpeedVal
-    end
 end)
-
-Rayfield:Notify({
-   Title = "DULTA ULTIMATE",
-   Content = "Скрипт успешно активирован. Приятной игры!",
-   Duration = 6.5,
-   Image = 4483362458,
-})
