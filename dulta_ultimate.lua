@@ -1,103 +1,136 @@
--- DULTA ULTIMATE v1.7 (ANTI-DEAD & SMART AIM)
-local p = game.Players.LocalPlayer
-local camera = workspace.CurrentCamera
-local rs = game:GetService("RunService")
-local uis = game:GetService("UserInputService")
+-- DULTA ULTIMATE v2.0 (Xan UI & Pro ESP)
+-- KEY: Dulta1111
 
--- ГЛАВНЫЙ ИНТЕРФЕЙС
-local sg = Instance.new("ScreenGui", game.CoreGui)
-sg.Name = "Dulta_v17"
+local UI = loadstring(game:HttpGet("https://xan.bar/init.lua"))()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 
-local mainBtn = Instance.new("TextButton", sg)
-mainBtn.Size = UDim2.new(0, 45, 0, 45)
-mainBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
-mainBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
-mainBtn.Text = "D"
-mainBtn.TextColor3 = Color3.new(1,1,1)
-mainBtn.Draggable = true
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
 
-local menu = Instance.new("Frame", sg)
-menu.Size = UDim2.new(0, 190, 0, 220)
-menu.Position = UDim2.new(0.05, 50, 0.2, 0)
-menu.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-menu.BorderColor3 = Color3.fromRGB(255, 0, 0)
-menu.Visible = false
+-- КОНФИГ
+local Config = {
+    ESP_Enabled = false,
+    ESP_TeamCheck = true,
+    AIM_Enabled = false,
+    AIM_FOV = 200,
+    AIM_Smooth = 0.1,
+    AIM_TargetPart = "Head",
+    ShowFOV = true,
+    Speed = 16
+}
 
-local function createToggle(name, y, callback)
-    local b = Instance.new("TextButton", menu)
-    b.Size = UDim2.new(1, -10, 0, 35)
-    b.Position = UDim2.new(0, 5, 0, y)
-    b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    b.Text = name .. ": OFF"
-    b.TextColor3 = Color3.new(1,1,1)
-    local state = false
-    b.MouseButton1Click:Connect(function()
-        state = not state
-        b.Text = name .. ": " .. (state and "ON" or "OFF")
-        b.BackgroundColor3 = state and Color3.fromRGB(180, 0, 0) or Color3.fromRGB(30, 30, 30)
-        callback(state)
-    end)
+-- СОЗДАНИЕ МЕНЮ
+local Window = UI.NewWindow("DULTA ULTIMATE", "v2.0")
+
+local MainTab = Window.NewTab("Combat")
+local VisualsTab = Window.NewTab("Visuals")
+local MiscTab = Window.NewTab("Movement")
+
+-- ВКЛАДКА COMBAT (AIM)
+MainTab.NewToggle("Enable Aimbot", false, function(v) Config.AIM_Enabled = v end)
+MainTab.NewSlider("Aimbot FOV", 50, 800, 200, function(v) Config.AIM_FOV = v end)
+MainTab.NewDropdown("Target Part", {"Head", "Torso"}, function(v) Config.AIM_TargetPart = v end)
+MainTab.NewToggle("Show FOV Circle", true, function(v) Config.ShowFOV = v end)
+
+-- ВКЛАДКА VISUALS (ESP)
+VisualsTab.NewToggle("Enable Highlights (WH)", false, function(v) Config.ESP_Enabled = v end)
+VisualsTab.NewToggle("Team Check", true, function(v) Config.ESP_TeamCheck = v end)
+
+-- ВКЛАДКА MISC
+MiscTab.NewSlider("WalkSpeed", 16, 200, 16, function(v) Config.Speed = v end)
+
+-- РАБОТА FOV КРУГА
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1
+FOVCircle.Color = Color3.fromRGB(255, 0, 0)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+
+-- ФУНКЦИЯ ESP (HIGHLIGHTS)
+local function UpdateESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local char = player.Character
+            local highlight = char:FindFirstChild("DultaHighlight")
+            
+            if Config.ESP_Enabled then
+                if not highlight then
+                    highlight = Instance.new("Highlight")
+                    highlight.Name = "DultaHighlight"
+                    highlight.Parent = char
+                end
+                
+                -- Проверка тимы
+                if Config.ESP_TeamCheck and player.Team == LocalPlayer.Team then
+                    highlight.Enabled = false
+                else
+                    highlight.Enabled = true
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.FillAlpha = 0.5
+                end
+            else
+                if highlight then highlight:Destroy() end
+            end
+        end
+    end
 end
 
-mainBtn.MouseButton1Click:Connect(function() menu.Visible = not menu.Visible end)
-
--- ПЕРЕМЕННЫЕ
-local aimOn, espOn, speedOn = false, false, false
-
-createToggle("SMART AIM", 10, function(v) aimOn = v end)
-createToggle("ESP BOX", 55, function(v) espOn = v end)
-createToggle("FAST SPEED", 100, function(v) speedOn = v end)
-createToggle("SERVER HOP", 145, function(v) 
-    if v then game:GetService("TeleportService"):Teleport(game.PlaceId) end 
-end)
-
--- ЛОГИКА АИМА (БЕЗ ТРУПОВ)
-rs.RenderStepped:Connect(function()
-    if aimOn then
-        local target = nil
-        local dist = 500
-        for _, v in pairs(game.Players:GetPlayers()) do
-            if v ~= p and v.Character and v.Character:FindFirstChild("Head") and v.Character:FindFirstChild("Humanoid") then
-                local head = v.Character.Head
-                local hum = v.Character.Humanoid
-                
-                -- ПРОВЕРКА: ЖИВОЙ ЛИ ИГРОК И НЕ В СПАВН-ЗАЩИТЕ
-                if hum.Health > 0 and not v.Character:FindFirstChildOfClass("ForceField") then
-                    local pos, vis = camera:WorldToViewportPoint(head.Position)
-                    if vis then
-                        local mag = (Vector2.new(pos.X, pos.Y) - uis:GetMouseLocation()).Magnitude
-                        if mag < dist then
-                            dist = mag
-                            target = head
+-- ЛОГИКА АИМА
+local function GetClosestPlayer()
+    local target = nil
+    local dist = Config.AIM_FOV
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(Config.AIM_TargetPart) then
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                if not (Config.ESP_TeamCheck and player.Team == LocalPlayer.Team) then
+                    local part = player.Character[Config.AIM_TargetPart]
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                    
+                    if onScreen then
+                        local mousePos = UserInputService:GetMouseLocation()
+                        local magnitude = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        if magnitude < dist then
+                            dist = magnitude
+                            target = part
                         end
                     end
                 end
             end
         end
-        if target then
-            -- Плавная доводка (0.2), чтобы не палиться античиту
-            camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, target.Position), 0.2)
-        end
     end
+    return target
+end
 
-    -- ESP (ВХ)
-    for _, v in pairs(game.Players:GetPlayers()) do
-        if v ~= p and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = v.Character.HumanoidRootPart
-            local esp = hrp:FindFirstChild("DultaESP")
-            if espOn and v.Character.Humanoid.Health > 0 then
-                if not esp then
-                    local b = Instance.new("BoxHandleAdornment", hrp)
-                    b.Name = "DultaESP"
-                    b.AlwaysOnTop, b.Size, b.Transparency = true, Vector3.new(4, 5, 1), 0.5
-                    b.Color3 = Color3.new(1, 0, 0)
-                end
-            elseif esp then esp:Destroy() end
+-- ЦИКЛ ОБНОВЛЕНИЯ
+RunService.RenderStepped:Connect(function()
+    -- Обновление круга
+    FOVCircle.Visible = Config.ShowFOV
+    FOVCircle.Radius = Config.AIM_FOV
+    FOVCircle.Position = UserInputService:GetMouseLocation()
+    
+    -- Обновление Аима
+    if Config.AIM_Enabled then
+        local target = GetClosestPlayer()
+        if target then
+            local targetPos = Camera:WorldToViewportPoint(target.Position)
+            local mousePos = UserInputService:GetMouseLocation()
+            -- Плавное наведение (Lerp)
+            mousemoverel((targetPos.X - mousePos.X) * Config.AIM_Smooth, (targetPos.Y - mousePos.Y) * Config.AIM_Smooth)
         end
     end
     
     -- Скорость
-    if speedOn and p.Character and p.Character:FindFirstChild("Humanoid") then
-        p.Character.Humanoid.WalkSpeed = 40
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = Config.Speed
     end
+    
+    UpdateESP()
 end)
+
+UI.Notify("DULTA v2.0", "Script Loaded Successfully!")
