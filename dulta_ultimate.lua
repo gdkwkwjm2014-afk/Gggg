@@ -1,5 +1,5 @@
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("DULTA ULTIMATE v15", "BloodTheme")
+local Window = Library.CreateLib("DULTA ULTIMATE v17 | TEAM FIX", "BloodTheme")
 
 -- Сервисы
 local Players = game:GetService("Players")
@@ -11,9 +11,10 @@ local Camera = workspace.CurrentCamera
 -- Настройки
 getgenv().AimEnabled = false
 getgenv().ESPEnabled = false
-getgenv().Speed = 16
+getgenv().FFA = false -- Режим "Все против всех"
+getgenv().WalkSpeed = 16
 
--- [[ СКРИПТ ДЛЯ ПЕРЕМЕЩЕНИЯ МЕНЮ ]]
+-- [[ ФУНКЦИЯ ПЕРЕМЕЩЕНИЯ (DRAGGABLE) ]]
 local function MakeDraggable(gui)
     local dragging, dragInput, dragStart, startPos
     gui.InputBegan:Connect(function(input)
@@ -21,62 +22,74 @@ local function MakeDraggable(gui)
             dragging = true
             dragStart = input.Position
             startPos = gui.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
-        end
-    end)
-    gui.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
         end
     end)
     UIS.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
 end
 
--- Применяем перетаскивание ко всему окну
-for _, v in pairs(game:GetService("CoreGui"):GetDescendants()) do
-    if v.Name == "Main" and v:IsA("Frame") then
-        MakeDraggable(v)
-    end
-end
+task.spawn(function()
+    local mainFrame = game:GetService("CoreGui"):WaitForChild("Library", 5)
+    if mainFrame then MakeDraggable(mainFrame:FindFirstChild("Main")) end
+end)
 
--- Вкладки
+-- [[ ВКЛАДКИ ]]
 local Main = Window:NewTab("Main")
-local Combat = Main:NewSection("Combat")
-local Visuals = Main:NewSection("Visuals")
-local Misc = Main:NewSection("Misc")
+local Combat = Main:NewSection("Combat ⚔️")
+local Visuals = Main:NewSection("Visuals 👁️")
+local Player = Main:NewSection("Player ⚡")
 
--- [КНОПКИ]
-Combat:NewToggle("Aimbot (Hard Lock)", "Наводит на ближайшего врага", function(state)
+-- [COMBAT]
+Combat:NewToggle("Aimbot Hard Lock", "Приклеивает прицел к цели", function(state)
     getgenv().AimEnabled = state
 end)
 
-Visuals:NewToggle("Team ESP", "Враги - Красные, Свои - Синие", function(state)
+Combat:NewToggle("FFA Mode (Аим на всех)", "Включи, если аим не видит врагов", function(state)
+    getgenv().FFA = state
+end)
+
+-- [VISUALS]
+Visuals:NewToggle("Smart ESP", "Разделение на врагов/друзей", function(state)
     getgenv().ESPEnabled = state
 end)
 
-Misc:NewSlider("WalkSpeed", "Скорость", 250, 16, function(s)
-    getgenv().Speed = s
+-- [PLAYER]
+Player:NewSlider("WalkSpeed", "Скорость", 250, 16, function(s)
+    getgenv().WalkSpeed = s
 end)
 
--- [ЛОГИКА АИМА]
-local function GetClosest()
+-- [[ ЛОГИКА ОПРЕДЕЛЕНИЯ ВРАГА ]]
+local function IsEnemy(Player)
+    if getgenv().FFA then return true end -- Если FFA включен, все враги
+    
+    -- Проверка по команде и цвету команды
+    if Player.Team ~= LP.Team or (Player.TeamColor ~= LP.TeamColor) then
+        return true
+    end
+    return false
+end
+
+-- [[ ПОИСК ЦЕЛИ ]]
+local function GetClosestTarget()
     local target = nil
-    local dist = math.huge
+    local shortestDist = math.huge
     for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LP and v.Team ~= LP.Team and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            if v.Character.Humanoid.Health > 0 then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(v.Character.HumanoidRootPart.Position)
-                if onScreen then
-                    local mag = (Vector2.new(screenPos.X, screenPos.Y) - UIS:GetMouseLocation()).Magnitude
-                    if mag < dist then
-                        dist = mag
+        if v ~= LP and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            if IsEnemy(v) and v.Character.Humanoid.Health > 0 then
+                local pos, vis = Camera:WorldToViewportPoint(v.Character.HumanoidRootPart.Position)
+                if vis then
+                    local mag = (Vector2.new(pos.X, pos.Y) - UIS:GetMouseLocation()).Magnitude
+                    if mag < shortestDist then
+                        shortestDist = mag
                         target = v.Character.HumanoidRootPart
                     end
                 end
@@ -86,35 +99,48 @@ local function GetClosest()
     return target
 end
 
--- [ОСНОВНОЙ ЦИКЛ]
+-- [[ ГЛАВНЫЙ ЦИКЛ ]]
 RS.RenderStepped:Connect(function()
-    -- Работа Аима
+    -- Аим
     if getgenv().AimEnabled then
-        local target = GetClosest()
-        if target then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+        local t = GetClosestTarget()
+        if t then
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, t.Position)
         end
     end
 
-    -- Работа Скорости
+    -- Скорость
     if LP.Character and LP.Character:FindFirstChild("Humanoid") then
-        LP.Character.Humanoid.WalkSpeed = getgenv().Speed
+        LP.Character.Humanoid.WalkSpeed = getgenv().WalkSpeed
     end
 
-    -- Работа ВХ
+    -- ESP
     if getgenv().ESPEnabled then
         for _, v in pairs(Players:GetPlayers()) do
             if v ~= LP and v.Character then
-                local h = v.Character:FindFirstChild("DultaHighlight")
+                local h = v.Character:FindFirstChild("DultaESP")
                 if v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
                     if not h then
                         h = Instance.new("Highlight", v.Character)
-                        h.Name = "DultaHighlight"
+                        h.Name = "DultaESP"
+                        h.FillAlpha = 0.5
                     end
-                    h.FillColor = (v.Team == LP.Team and Color3.new(0, 0.5, 1) or Color3.new(1, 0, 0))
+                    
+                    -- Умная раскраска
+                    if IsEnemy(v) then
+                        h.FillColor = Color3.fromRGB(255, 0, 0) -- Красный враг
+                    else
+                        h.FillColor = Color3.fromRGB(0, 255, 0) -- Зеленый друг
+                    end
                 else
                     if h then h:Destroy() end
                 end
+            end
+        end
+    else
+        for _, v in pairs(Players:GetPlayers()) do
+            if v.Character and v.Character:FindFirstChild("DultaESP") then
+                v.Character.DultaESP:Destroy()
             end
         end
     end
