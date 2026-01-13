@@ -1,13 +1,13 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "DULTA ULTIMATE v7.0",
-   LoadingTitle = "Загрузка модулей...",
-   LoadingSubtitle = "by Gemini",
+   Name = "DULTA ULTIMATE v8.0 (PRO)",
+   LoadingTitle = "Интеграция исходников...",
+   LoadingSubtitle = "Unloosed + VeryUp Logic",
    ConfigurationSaving = { Enabled = false }
 })
 
--- Переменные управления
+-- Сервисы и переменные
 local LP = game:GetService("Players").LocalPlayer
 local Camera = workspace.CurrentCamera
 local RunService = game:GetService("RunService")
@@ -18,115 +18,105 @@ getgenv().ESP = false
 getgenv().FOVSize = 150
 getgenv().Speed = 16
 
--- Отрисовка FOV Круга
-local Circle = Drawing.new("Circle")
-Circle.Color = Color3.fromRGB(255, 255, 255)
-Circle.Thickness = 1
-Circle.NumSides = 100
-Circle.Radius = getgenv().FOVSize
-Circle.Filled = false
-Circle.Visible = false
+-- Настройка круга FOV из твоих исходников
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1
+FOVCircle.Color = Color3.fromRGB(0, 255, 255)
+FOVCircle.NumSides = 100
+FOVCircle.Filled = false
+FOVCircle.Visible = false
 
--- Вкладка Combat
+-- ВКЛАДКА COMBAT (Логика из Unloosed)
 local CombatTab = Window:CreateTab("Combat ⚔️")
-
 CombatTab:CreateToggle({
-   Name = "Hard Lock (Враги)",
+   Name = "Hard Lock (Source Logic)",
    CurrentValue = false,
-   Callback = function(Value) 
-      getgenv().Aimbot = Value 
-      Circle.Visible = Value
+   Callback = function(v) 
+      getgenv().Aimbot = v 
+      FOVCircle.Visible = v
    end,
 })
-
 CombatTab:CreateSlider({
-   Name = "Размер Круга FOV",
+   Name = "FOV Radius",
    Min = 10, Max = 800, CurrentValue = 150,
-   Callback = function(Value) 
-      getgenv().FOVSize = Value
-      Circle.Radius = Value
+   Callback = function(v) 
+      getgenv().FOVSize = v
+      FOVCircle.Radius = v
    end,
 })
 
--- Вкладка Visuals
+-- ВКЛАДКА VISUALS (Логика из VeryUp)
 local VisualsTab = Window:CreateTab("Visuals 👁️")
-
 VisualsTab:CreateToggle({
-   Name = "ESP (Highlight + Health)",
+   Name = "Highlight ESP (Team Based)",
    CurrentValue = false,
-   Callback = function(Value) getgenv().ESP = Value end,
+   Callback = function(v) getgenv().ESP = v end,
 })
 
--- Вкладка Misc
+-- ВКЛАДКА MISC
 local MiscTab = Window:CreateTab("Misc ⚙️")
-
 MiscTab:CreateSlider({
-   Name = "Safe Speed",
-   Min = 16, Max = 100, CurrentValue = 16,
-   Callback = function(Value) getgenv().Speed = Value end,
+   Name = "WalkSpeed Hack",
+   Min = 16, Max = 200, CurrentValue = 16,
+   Callback = function(v) getgenv().Speed = v end,
 })
 
--- Логика поиска цели
-local function GetClosestPlayer()
-    local Target = nil
-    local MaxDist = getgenv().FOVSize
-    
+-- ФУНКЦИЯ ПОИСКА ЦЕЛИ (Из исходника)
+local function GetClosest()
+    local target = nil
+    local dist = getgenv().FOVSize
     for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-        if v ~= LP and v.Team ~= LP.Team and v.Character and v.Character:FindFirstChild("Head") then
-            local Head = v.Character.Head
-            local Pos, OnScreen = Camera:WorldToViewportPoint(Head.Position)
-            
-            if OnScreen then
-                local MousePos = UIS:GetMouseLocation()
-                local Dist = (Vector2.new(Pos.X, Pos.Y) - MousePos).Magnitude
-                
-                if Dist < MaxDist then
-                    MaxDist = Dist
-                    Target = Head
+        if v ~= LP and v.Character and v.Character:FindFirstChild("Head") and v.Team ~= LP.Team then
+            local hum = v.Character:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                local pos, vis = Camera:WorldToViewportPoint(v.Character.Head.Position)
+                if vis then
+                    local mag = (Vector2.new(pos.X, pos.Y) - UIS:GetMouseLocation()).Magnitude
+                    if mag < dist then
+                        dist = mag
+                        target = v.Character.Head
+                    end
                 end
             end
         end
     end
-    return Target
+    return target
 end
 
--- ГЛАВНЫЙ ЦИКЛ ОБРАБОТКИ
+-- РАБОЧИЙ ЦИКЛ
 RunService.RenderStepped:Connect(function()
-    -- Центрируем круг FOV
-    Circle.Position = UIS:GetMouseLocation()
+    FOVCircle.Position = UIS:GetMouseLocation()
     
-    -- Работа Аима
+    -- Логика Аима
     if getgenv().Aimbot then
-        local Target = GetClosestPlayer()
-        if Target then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, Target.Position)
+        local target = GetClosest()
+        if target then
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, target.Position), 0.2)
         end
     end
 
-    -- Работа ВХ и Скорости
+    -- Логика ESP (Highlight)
     for _, v in pairs(game:GetService("Players"):GetPlayers()) do
         if v.Character then
-            -- ESP Логика
-            local Highlight = v.Character:FindFirstChild("DultaHighlight")
+            local high = v.Character:FindFirstChild("SourceESP")
             if getgenv().ESP and v ~= LP and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-                if not Highlight then
-                    Highlight = Instance.new("Highlight", v.Character)
-                    Highlight.Name = "DultaHighlight"
+                if not high then
+                    high = Instance.new("Highlight", v.Character)
+                    high.Name = "SourceESP"
                 end
-                Highlight.FillColor = (v.Team == LP.Team and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
-                Highlight.FillAlpha = 0.5
+                high.FillColor = (v.Team == LP.Team and Color3.new(0, 1, 0) or Color3.new(1, 0, 0))
+                high.FillAlpha = 0.5
+                high.OutlineColor = Color3.new(1, 1, 1)
             else
-                if Highlight then Highlight:Destroy() end
+                if high then high:Destroy() end
             end
         end
     end
-
-    -- Безопасная скорость (через CFrame, чтобы не кикало)
-    if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") and getgenv().Speed > 16 then
-        local HRP = LP.Character.HumanoidRootPart
-        local MoveDir = LP.Character.Humanoid.MoveDirection
-        HRP.CFrame = HRP.CFrame + (MoveDir * (getgenv().Speed / 100))
+    
+    -- Speed Hack
+    if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+        LP.Character.Humanoid.WalkSpeed = getgenv().Speed
     end
 end)
 
-Rayfield:Notify({Title = "DULTA V7.1", Content = "Скрипт полностью перенастроен!", Duration = 5})
+Rayfield:Notify({Title = "DULTA v8.0", Content = "Функции из исходников успешно загружены!", Duration = 5})
