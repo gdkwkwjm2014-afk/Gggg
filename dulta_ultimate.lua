@@ -1,95 +1,73 @@
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("DULTA ULTIMATE v17 | TEAM FIX", "BloodTheme")
+local Window = Library.CreateLib("DULTA ULTIMATE v19 | TEAM & FLY", "BloodTheme")
 
--- Сервисы
 local Players = game:GetService("Players")
 local LP = Players.LocalPlayer
 local RS = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 
--- Настройки
 getgenv().AimEnabled = false
 getgenv().ESPEnabled = false
+getgenv().FlyEnabled = false
+getgenv().Speed = 16
+getgenv().FlySpeed = 50
 getgenv().FFA = false -- Режим "Все против всех"
-getgenv().WalkSpeed = 16
 
--- [[ ФУНКЦИЯ ПЕРЕМЕЩЕНИЯ (DRAGGABLE) ]]
-local function MakeDraggable(gui)
-    local dragging, dragInput, dragStart, startPos
-    gui.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = gui.Position
-        end
-    end)
-    UIS.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-    UIS.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-end
-
-task.spawn(function()
-    local mainFrame = game:GetService("CoreGui"):WaitForChild("Library", 5)
-    if mainFrame then MakeDraggable(mainFrame:FindFirstChild("Main")) end
-end)
-
--- [[ ВКЛАДКИ ]]
+-- [ВКЛАДКИ]
 local Main = Window:NewTab("Main")
-local Combat = Main:NewSection("Combat ⚔️")
-local Visuals = Main:NewSection("Visuals 👁️")
-local Player = Main:NewSection("Player ⚡")
+local Combat = Main:NewSection("Combat & Aim")
+local Visuals = Main:NewSection("Visuals (Team Check)")
+local Movement = Main:NewSection("Movement & Fly")
 
 -- [COMBAT]
-Combat:NewToggle("Aimbot Hard Lock", "Приклеивает прицел к цели", function(state)
+Combat:NewToggle("Aimbot (Hard Lock)", "Наведение на ВРАГОВ", function(state)
     getgenv().AimEnabled = state
 end)
 
-Combat:NewToggle("FFA Mode (Аим на всех)", "Включи, если аим не видит врагов", function(state)
+Combat:NewToggle("FFA Mode", "Аим на ВСЕХ (включай, если не наводится)", function(state)
     getgenv().FFA = state
 end)
 
 -- [VISUALS]
-Visuals:NewToggle("Smart ESP", "Разделение на врагов/друзей", function(state)
+Visuals:NewToggle("Smart ESP", "Враги: Красные, Свои: Зеленые", function(state)
     getgenv().ESPEnabled = state
 end)
 
--- [PLAYER]
-Player:NewSlider("WalkSpeed", "Скорость", 250, 16, function(s)
-    getgenv().WalkSpeed = s
+-- [MOVEMENT]
+Movement:NewSlider("Safe Speed", "Скорость без телепортов", 250, 16, function(s)
+    getgenv().Speed = s
 end)
 
--- [[ ЛОГИКА ОПРЕДЕЛЕНИЯ ВРАГА ]]
-local function IsEnemy(Player)
-    if getgenv().FFA then return true end -- Если FFA включен, все враги
-    
-    -- Проверка по команде и цвету команды
-    if Player.Team ~= LP.Team or (Player.TeamColor ~= LP.TeamColor) then
+Movement:NewToggle("Fly (Полет)", "Летать по карте", function(state)
+    getgenv().FlyEnabled = state
+end)
+
+Movement:NewSlider("Fly Speed", "Скорость полета", 300, 50, function(s)
+    getgenv().FlySpeed = s
+end)
+
+-- [ЛОГИКА ОПРЕДЕЛЕНИЯ ВРАГА]
+local function IsEnemy(v)
+    if getgenv().FFA then return true end
+    if v.Team ~= LP.Team or v.TeamColor ~= LP.TeamColor then
         return true
     end
     return false
 end
 
--- [[ ПОИСК ЦЕЛИ ]]
-local function GetClosestTarget()
+-- [ПОИСК ЦЕЛИ]
+local function GetTarget()
     local target = nil
-    local shortestDist = math.huge
+    local dist = math.huge
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= LP and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
             if IsEnemy(v) and v.Character.Humanoid.Health > 0 then
                 local pos, vis = Camera:WorldToViewportPoint(v.Character.HumanoidRootPart.Position)
                 if vis then
                     local mag = (Vector2.new(pos.X, pos.Y) - UIS:GetMouseLocation()).Magnitude
-                    if mag < shortestDist then
-                        shortestDist = mag
+                    if mag < dist then
+                        dist = mag
                         target = v.Character.HumanoidRootPart
                     end
                 end
@@ -99,22 +77,37 @@ local function GetClosestTarget()
     return target
 end
 
--- [[ ГЛАВНЫЙ ЦИКЛ ]]
+-- [ГЛАВНЫЙ ЦИКЛ]
 RS.RenderStepped:Connect(function()
-    -- Аим
+    -- АИМБОТ
     if getgenv().AimEnabled then
-        local t = GetClosestTarget()
+        local t = GetTarget()
         if t then
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, t.Position)
         end
     end
 
-    -- Скорость
-    if LP.Character and LP.Character:FindFirstChild("Humanoid") then
-        LP.Character.Humanoid.WalkSpeed = getgenv().WalkSpeed
+    -- БЕЗОПАСНАЯ СКОРОСТЬ
+    if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") and not getgenv().FlyEnabled then
+        local hrp = LP.Character.HumanoidRootPart
+        local hum = LP.Character.Humanoid
+        if hum.MoveDirection.Magnitude > 0 and getgenv().Speed > 16 then
+            hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (getgenv().Speed / 120))
+        end
     end
 
-    -- ESP
+    -- ПОЛЕТ (FLY)
+    if getgenv().FlyEnabled and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LP.Character.HumanoidRootPart
+        hrp.Velocity = Vector3.new(0, 0, 0)
+        
+        local moveDir = LP.Character.Humanoid.MoveDirection
+        if moveDir.Magnitude > 0 then
+            hrp.CFrame = hrp.CFrame + (Camera.CFrame.LookVector * (getgenv().FlySpeed / 10))
+        end
+    end
+
+    -- SMART ESP
     if getgenv().ESPEnabled then
         for _, v in pairs(Players:GetPlayers()) do
             if v ~= LP and v.Character then
@@ -123,15 +116,14 @@ RS.RenderStepped:Connect(function()
                     if not h then
                         h = Instance.new("Highlight", v.Character)
                         h.Name = "DultaESP"
-                        h.FillAlpha = 0.5
                     end
                     
-                    -- Умная раскраска
                     if IsEnemy(v) then
-                        h.FillColor = Color3.fromRGB(255, 0, 0) -- Красный враг
+                        h.FillColor = Color3.fromRGB(255, 0, 0) -- Враг: Красный
                     else
-                        h.FillColor = Color3.fromRGB(0, 255, 0) -- Зеленый друг
+                        h.FillColor = Color3.fromRGB(0, 255, 0) -- Свой: Зеленый
                     end
+                    h.FillAlpha = 0.5
                 else
                     if h then h:Destroy() end
                 end
