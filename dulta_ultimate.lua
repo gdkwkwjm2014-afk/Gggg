@@ -1,102 +1,104 @@
 --[[
-    DULTA ULTIMATE - Alpha (Fixed Aim)
+    DULTA ULTIMATE - VERSION ALPHA
+    Developer: StepBroFurious & Gemini
+    Functions: Aim on Shoot, ESP, Speed, Anti-Ban
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
--- Очистка логов для защиты
-pcall(function()
-    if getconnections then
-        for _, v in pairs(getconnections(game:GetService("LogService").MessageOut)) do v:Disable() end
-    end
-end)
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-local Camera = workspace.CurrentCamera
-
+-- Глобальные настройки
 getgenv().DultaSettings = {
     Aimbot = false,
-    AimPart = "Head", -- Можно сменить на "HumanoidRootPart"
-    Smoothness = 0.2, -- Плавность (чем меньше, тем быстрее)
     ESP = false,
-    SpeedEnabled = false,
-    SpeedValue = 50
+    Speed = false,
+    WalkSpeedValue = 60,
+    AimPart = "Head"
 }
 
--- Блок Anti-Ban (Базовый)
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+-- 1. АНТИ-БАН И АНТИ-КИК
+local X;
+X = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
-    if method == "Ban" or method == "Kick" then return nil end
-    return oldNamecall(self, ...)
+    local args = {...}
+    if method == "Ban" or method == "Kick" or method == "Panic" then
+        warn("DULTA: Попытка бана/кика заблокирована!")
+        return nil
+    end
+    return X(self, ...)
 end)
 
--- Интерфейс (Твое меню)
+-- 2. ГРАФИЧЕСКИЙ ИНТЕРФЕЙС (UI)
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.Name = "DultaRoot"
+
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 250, 0, 320)
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -160)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.Size = UDim2.new(0, 260, 0, 340)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -170)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = true
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+MainFrame.Draggable = true -- Меню можно перемещать
+local MainCorner = Instance.new("UICorner", MainFrame)
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "DULTA ULTIMATE"
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.Text = "DULTA SOFT"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.BackgroundTransparency = 1
-Title.TextSize = 18
+Title.TextSize = 22
 Title.Font = Enum.Font.GothamBold
 
+-- Иконка "D" для сворачивания
 local OpenButton = Instance.new("TextButton", ScreenGui)
-OpenButton.Size = UDim2.new(0, 50, 0, 50)
-OpenButton.Position = UDim2.new(0, 10, 0.5, 0)
-OpenButton.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+OpenButton.Size = UDim2.new(0, 55, 0, 55)
+OpenButton.Position = UDim2.new(0, 20, 0.5, 0)
+OpenButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 OpenButton.Text = "D"
 OpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-OpenButton.TextSize = 25
+OpenButton.TextSize = 28
+OpenButton.Font = Enum.Font.GothamBold
 OpenButton.Visible = false
-Instance.new("UICorner", OpenButton).CornerRadius = UDim.new(1, 0)
+local btnCorner = Instance.new("UICorner", OpenButton)
+btnCorner.CornerRadius = UDim.new(1, 0)
 OpenButton.Draggable = true
 
-local function CreateButton(text, yPos, callback)
+-- Функция для создания кнопок в меню
+local function AddButton(text, yPos, callback)
     local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0, 210, 0, 40)
-    btn.Position = UDim2.new(0, 20, 0, yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    btn.Size = UDim2.new(0, 220, 0, 45)
+    btn.Position = UDim2.new(0.5, -110, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     btn.Text = text
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.Gotham
-    Instance.new("UICorner", btn)
-    btn.MouseButton1Click:Connect(function() callback(btn) end)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 14
+    local corner = Instance.new("UICorner", btn)
+    
+    btn.MouseButton1Click:Connect(function()
+        callback(btn)
+    end)
 end
 
--- Функциональные кнопки
-CreateButton("Aimbot: OFF", 60, function(self)
+-- Логика кнопок меню
+AddButton("AIMBOT: OFF", 60, function(self)
     getgenv().DultaSettings.Aimbot = not getgenv().DultaSettings.Aimbot
-    self.Text = getgenv().DultaSettings.Aimbot and "Aimbot: ON" or "Aimbot: OFF"
-    self.BackgroundColor3 = getgenv().DultaSettings.Aimbot and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(45, 45, 55)
+    self.Text = getgenv().DultaSettings.Aimbot and "AIMBOT: ON" or "AIMBOT: OFF"
+    self.BackgroundColor3 = getgenv().DultaSettings.Aimbot and Color3.fromRGB(0, 100, 255) or Color3.fromRGB(40, 40, 45)
 end)
 
-CreateButton("ESP: OFF", 110, function(self)
+AddButton("WALLHACK (ESP): OFF", 115, function(self)
     getgenv().DultaSettings.ESP = not getgenv().DultaSettings.ESP
-    self.Text = getgenv().DultaSettings.ESP and "ESP: ON" or "ESP: OFF"
-    self.BackgroundColor3 = getgenv().DultaSettings.ESP and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(45, 45, 55)
+    self.Text = getgenv().DultaSettings.ESP and "WALLHACK: ON" or "WALLHACK: OFF"
+    self.BackgroundColor3 = getgenv().DultaSettings.ESP and Color3.fromRGB(0, 100, 255) or Color3.fromRGB(40, 40, 45)
 end)
 
-CreateButton("Speed: OFF", 160, function(self)
-    getgenv().DultaSettings.SpeedEnabled = not getgenv().DultaSettings.SpeedEnabled
-    self.Text = getgenv().DultaSettings.SpeedEnabled and "Speed: ON" or "Speed: OFF"
-    self.BackgroundColor3 = getgenv().DultaSettings.SpeedEnabled and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(45, 45, 55)
+AddButton("SPEEDHACK: OFF", 170, function(self)
+    getgenv().DultaSettings.Speed = not getgenv().DultaSettings.Speed
+    self.Text = getgenv().DultaSettings.Speed and "SPEED: ON" or "SPEED: OFF"
+    self.BackgroundColor3 = getgenv().DultaSettings.Speed and Color3.fromRGB(0, 100, 255) or Color3.fromRGB(40, 40, 45)
 end)
 
-CreateButton("Close Menu", 250, function()
+AddButton("HIDE MENU", 260, function()
     MainFrame.Visible = false
     OpenButton.Visible = true
 end)
@@ -106,18 +108,29 @@ OpenButton.MouseButton1Click:Connect(function()
     OpenButton.Visible = false
 end)
 
--- Улучшенный алгоритм Аимбота
+-- 3. ЛОГИКА ФУНКЦИЙ
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Поиск ближайшего игрока к прицелу
 local function GetClosestPlayer()
     local target = nil
-    local distance = math.huge
+    local shortestDistance = math.huge
+    
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(getgenv().DultaSettings.AimPart) then
-            local pos, onScreen = Camera:WorldToViewportPoint(player.Character[getgenv().DultaSettings.AimPart].Position)
-            if onScreen then
-                local mouseDist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                if mouseDist < distance then
-                    distance = mouseDist
-                    target = player
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local part = player.Character:FindFirstChild(getgenv().DultaSettings.AimPart)
+            if part then
+                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local distance = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        target = player
+                    end
                 end
             end
         end
@@ -125,31 +138,25 @@ local function GetClosestPlayer()
     return target
 end
 
--- Основной цикл работы
+-- Основной цикл (обновление каждый кадр)
 RunService.RenderStepped:Connect(function()
-    -- Спидхак
-    if getgenv().DultaSettings.SpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = getgenv().DultaSettings.SpeedValue
-    end
-
-    -- Аимбот (работает при зажатой Правой Кнопке Мыши)
-    if getgenv().DultaSettings.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        local target = GetClosestPlayer()
-        if target and target.Character then
-            local targetPos = target.Character[getgenv().DultaSettings.AimPart].Position
-            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), getgenv().DultaSettings.Smoothness)
+    -- AIMBOT (Наводится при выстреле - Левая Кнопка Мыши)
+    if getgenv().DultaSettings.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+        local closest = GetClosestPlayer()
+        if closest and closest.Character and closest.Character:FindFirstChild(getgenv().DultaSettings.AimPart) then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, closest.Character[getgenv().DultaSettings.AimPart].Position)
         end
     end
 
-    -- ВХ (ESP)
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character then
-            local hl = plr.Character:FindFirstChild("DultaHL")
+    -- ESP (Подсветка)
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local hl = player.Character:FindFirstChild("DultaHighlight")
             if getgenv().DultaSettings.ESP then
                 if not hl then
-                    hl = Instance.new("Highlight", plr.Character)
-                    hl.Name = "DultaHL"
-                    hl.FillColor = Color3.fromRGB(255, 0, 0)
+                    hl = Instance.new("Highlight", player.Character)
+                    hl.Name = "DultaHighlight"
+                    hl.FillColor = Color3.fromRGB(255, 0, 0) -- Красный цвет
                     hl.OutlineColor = Color3.fromRGB(255, 255, 255)
                 end
             else
@@ -157,6 +164,13 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
+
+    -- SPEED
+    if getgenv().DultaSettings.Speed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = getgenv().DultaSettings.WalkSpeedValue
+    elseif LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = 16
+    end
 end)
 
-print("DULTA V2 FIXED LOADED")
+print("DULTA ULTIMATE LOADED SUCCESSFULLY")
